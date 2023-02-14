@@ -1,19 +1,93 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: pipeline for my-app
+Description: deploy pipeline for my-app
 
 Parameters:
-  OAuthToken:
+  AppName:
     Type: String
-    NoEcho: true
   Branch:
     Type: String
   Owner:
     Type: String
   Repo:
     Type: String
+  OAuthToken:
+    Type: String
+    NoEcho: true
 
 Resources:
-  PipelineRole:
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Ref AppName
+      ComputePlatform: Server
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    DependsOn: CodeDeployRole
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub ${CodeDeployApplication}-DeployGroup
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      ServiceRoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/${CodeDeployApplication}-CodeDeployRole
+      DeploymentStyle:
+        DeploymentType: IN_PLACE
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+      Ec2TagFilters:
+        - Type: VALUE_ONLY
+          Value: !Ref AppName
+
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${CodeDeployApplication}-Pipeline
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Location: !Ref ArtifactStoreBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: 1
+              Configuration:
+                Branch: !Ref Branch
+                OAuthToken: !Ref OAuthToken
+                Owner: !Ref Owner
+                PollForSourceChanges: true
+                Repo: !Ref Repo
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Region: !Ref AWS::Region
+              Namespace: SourceVariables
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Sub ${CodeDeployApplication}-DeployGroup
+              InputArtifacts:
+                - Name: SourceArtifact
+              Region: !Ref AWS::Region
+              Namespace: DeployVariables
+              RunOrder: 1
+
+  CodePipelineRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -42,94 +116,17 @@ Resources:
                 Resource: "*"
 
   CodeDeployRole:
-    Type: "AWS::IAM::Role"
+    Type: AWS::IAM::Role
     Properties:
-      Path: "/"
-      RoleName: !Sub "${CodeDeployApplication}CodeDeployRole"
-      AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codedeploy.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
-      MaxSessionDuration: 3600
+      Path: /
+      RoleName: !Sub ${CodeDeployApplication}-CodeDeployRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
       ManagedPolicyArns:
-      - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-      - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
-      Description: "Allows CodeDeploy to call AWS services such as Auto Scaling on your behalf."
-
-  CodePipelinePipeline:
-    Type: "AWS::CodePipeline::Pipeline"
-    Properties:
-      Name: !Sub "${CodeDeployApplication}Pipeline"
-      RoleArn: !GetAtt PipelineRole.Arn
-      ArtifactStore:
-        Location: !Ref ArtifactStoreBucket
-        Type: "S3"
-      Stages:
-      -
-        Name: "Source"
-        Actions:
-        -
-          Name: "Source"
-          ActionTypeId:
-            Category: "Source"
-            Owner: "ThirdParty"
-            Provider: "GitHub"
-            Version: "1"
-          Configuration:
-            Branch: !Ref Branch
-            OAuthToken: !Ref OAuthToken
-            Owner: !Ref Owner
-            PollForSourceChanges: "true"
-            Repo: !Ref Repo
-          OutputArtifacts:
-          -
-            Name: "SourceArtifact"
-          Region: !Ref AWS::Region
-          Namespace: "SourceVariables"
-          RunOrder: 1
-      -
-        Name: "Deploy"
-        Actions:
-        -
-          Name: "Deploy"
-          ActionTypeId:
-            Category: "Deploy"
-            Owner: "AWS"
-            Provider: "CodeDeploy"
-            Version: "1"
-          Configuration:
-            ApplicationName: !Ref CodeDeployApplication
-            DeploymentGroupName: !Sub "${CodeDeployApplication}DeployGroup"
-          InputArtifacts:
-          -
-            Name: "SourceArtifact"
-          Region: !Ref AWS::Region
-          Namespace: "DeployVariables"
-          RunOrder: 1
-
-  CodeDeployApplication:
-    Type: "AWS::CodeDeploy::Application"
-    Properties:
-      ApplicationName: "my-app"
-      ComputePlatform: "Server"
-
-  CodeDeployDeploymentGroup:
-    Type: "AWS::CodeDeploy::DeploymentGroup"
-    DependsOn: CodeDeployRole
-    Properties:
-      ApplicationName: !Ref CodeDeployApplication
-      DeploymentGroupName: !Sub "${CodeDeployApplication}DeployGroup"
-      DeploymentConfigName: "CodeDeployDefault.AllAtOnce"
-      ServiceRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/${CodeDeployApplication}CodeDeployRole"
-      AlarmConfiguration:
-        Enabled: false
-        IgnorePollAlarmFailure: false
-      DeploymentStyle:
-        DeploymentType: "IN_PLACE"
-        DeploymentOption: "WITHOUT_TRAFFIC_CONTROL"
-      Ec2TagFilters:
-        - Type: VALUE_ONLY
-          Value: "my-app"
-
-  ArtifactStoreBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      VersioningConfiguration:
-        Status: Enabled
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole

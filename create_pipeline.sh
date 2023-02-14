@@ -20,6 +20,7 @@ aws --profile "${PROFILE_OPTION}" cloudformation update-stack \
     ParameterKey=OAuthToken,ParameterValue="${1}" \
     ParameterKey=Branch,ParameterValue=main \
     ParameterKey=Owner,ParameterValue=take314 \
-    ParameterKey=Repo,ParameterValue=my-app
+    ParameterKey=Repo,ParameterValue=my-app \
+    ParameterKey=AppName,ParameterValue=my-app
 
 
