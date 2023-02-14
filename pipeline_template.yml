@@ -5,9 +5,14 @@ Parameters:
   OAuthToken:
     Type: String
     NoEcho: true
+  Branch:
+    Type: String
+  Owner:
+    Type: String
+  Repo:
+    Type: String
 
 Resources:
-
   PipelineRole:
     Type: AWS::IAM::Role
     Properties:
@@ -68,11 +73,11 @@ Resources:
             Provider: "GitHub"
             Version: "1"
           Configuration:
-            Branch: "main"
+            Branch: !Ref Branch
             OAuthToken: !Ref OAuthToken
-            Owner: "take314"
+            Owner: !Ref Owner
             PollForSourceChanges: "true"
-            Repo: "my-app"
+            Repo: !Ref Repo
           OutputArtifacts:
           -
             Name: "SourceArtifact"
