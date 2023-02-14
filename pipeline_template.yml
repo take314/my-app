@@ -283,8 +283,9 @@ Resources:
       DeploymentStyle:
         DeploymentType: "IN_PLACE"
         DeploymentOption: "WITHOUT_TRAFFIC_CONTROL"
-      Ec2TagSet: {}
-      OnPremisesTagSet: {}
+      Ec2TagFilters:
+        - Type: VALUE_ONLY
+          Value: "my-app"
 
   ArtifactStoreBucket:
     Type: AWS::S3::Bucket

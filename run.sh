@@ -1,3 +1,3 @@
 #!/bin/sh
 
-streamlit run main.py
+~/.local/bin/streamlit run main.py
