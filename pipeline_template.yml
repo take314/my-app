@@ -244,27 +244,6 @@ Resources:
           Namespace: "SourceVariables"
           RunOrder: 1
       -
-        Name: "Build"
-        Actions:
-        -
-          Name: "Build"
-          ActionTypeId:
-            Category: "Build"
-            Owner: "AWS"
-            Provider: "CodeBuild"
-            Version: "1"
-          Configuration:
-            ProjectName: !Sub "${CodeDeployApplication}Build"
-          InputArtifacts:
-          -
-            Name: "SourceArtifact"
-          OutputArtifacts:
-          -
-            Name: "BuildArtifact"
-          Region: !Ref AWS::Region
-          Namespace: "BuildVariables"
-          RunOrder: 1
-      -
         Name: "Deploy"
         Actions:
         -
@@ -279,7 +258,7 @@ Resources:
             DeploymentGroupName: !Sub "${CodeDeployApplication}DeployGroup"
           InputArtifacts:
           -
-            Name: "BuildArtifact"
+            Name: "SourceArtifact"
           Region: !Ref AWS::Region
           Namespace: "DeployVariables"
           RunOrder: 1
